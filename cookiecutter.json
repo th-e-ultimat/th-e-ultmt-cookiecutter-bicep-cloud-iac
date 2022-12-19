@@ -1,0 +1,11 @@
+{
+  "github_org": "Your account or organization",
+  "github_repo": "Your repository Name",
+  "company_short_name": "Your short company",
+  "company_full_name": "Your fullcompany",
+  "project_name": "The name of the extension package (as in `pip install {project_name}`",
+  "package_name": "{{ cookiecutter.project_name.lower().replace('-', '_') }}",
+  "short_description": "A short description of the extension",
+  "author_name": "Your name",
+  "author_email": "Your email"
+}

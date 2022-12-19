@@ -1,0 +1,48 @@
+name: API Management APIs Deployment
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    env:
+      DEPLOYMENT_LOCATION: southafricanorth
+      RESOURCE_PREFIX: {{cookiecutter.res_pref}}
+    outputs:
+      DEPLOYMENT_ENVIRONMENT: ${{steps.branch-dependent-variables.outputs.DEPLOYMENT_ENVIRONMENT}}
+
+    steps:
+      # Checkout code
+      - uses: actions/checkout@v2
+
+      - name: Set branch dependent variables
+        id: branch-dependent-variables
+        run: |
+          if [[ "${{github.base_ref}}" == "main" || "${{github.ref}}" == "refs/heads/main" ]]
+          then
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::prod"
+          elif [[ "${{github.base_ref}}" == "qa" || "${{github.ref}}" == "refs/heads/qa" ]]
+          then
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::qa"
+          else
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::qa"
+          fi
+
+        # Log into Azure
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+        # Deploy Bicep file
+      - name: deploy
+        uses: azure/arm-deploy@v1
+        id: deploy
+        with:
+          subscriptionId: ${{ secrets.AZURE_SUBSCRIPTION }}
+          scope: subscription
+          region: ${{env.DEPLOYMENT_LOCATION}}
+          template: bicep/apimdeploy.bicep
+          parameters: environmentType=${{steps.branch-dependent-variables.outputs.DEPLOYMENT_ENVIRONMENT}} prefix=${{env.RESOURCE_PREFIX}}
+          failOnStdErr: false

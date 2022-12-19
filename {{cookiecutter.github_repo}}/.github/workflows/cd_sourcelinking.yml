@@ -1,0 +1,42 @@
+name: Last Deployment Source Linking
+
+on:
+  workflow_dispatch:
+
+jobs:
+
+  link-source-control:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout code
+      - uses: actions/checkout@v2
+      
+      - name: Set branch dependent variables
+        id: branch-dependent-variables
+        run: |
+          if [[ "${{github.base_ref}}" == "main" || "${{github.ref}}" == "refs/heads/main" ]]
+          then
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::prod"
+          elif [[ "${{github.base_ref}}" == "qa" || "${{github.ref}}" == "refs/heads/qa" ]]
+          then
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::qa"
+          else
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::qa"
+          fi
+
+      # Log into Azure
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+        # Get deployment and link to source control
+      - name: Connect source control from deployment
+        id: connect-source-control
+        run: |
+          chmod +x $GITHUB_WORKSPACE/scripts/sourcecontrol/linkdeployments.sh
+          $GITHUB_WORKSPACE/scripts/sourcecontrol/linkdeployments.sh
+        shell: bash
+        env:
+          GITHUB_TOKEN: ${{ secrets.ADMIN_GITHUB_TOKEN }}
+          DEPLOYMENT_ENVIRONMENT: ${{ steps.branch-dependent-variables.outputs.DEPLOYMENT_ENVIRONMENT }}

@@ -1,0 +1,61 @@
+name: Deployment Dry Run
+
+on:
+  pull_request:
+    branches:
+      - 'dev'
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+
+    env:
+      DEPLOYMENT_LOCATION: southafricanorth
+      RESOURCE_PREFIX: {{cookiecutter.res_pref}}
+
+    steps:
+      - uses: actions/checkout@v2
+
+      - name: Set branch dependent variables
+        id: branch-dependent-variables
+        run: |
+          if [[ "${{github.base_ref}}" == "main" || "${{github.ref}}" == "refs/heads/main" ]]
+          then
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::prod"
+          elif [[ "${{github.base_ref}}" == "qa" || "${{github.ref}}" == "refs/heads/qa" ]]
+          then
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::qa"
+          else
+            echo "::set-output name=DEPLOYMENT_ENVIRONMENT::qa"
+          fi
+
+        # Log into Azure
+      - uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+        # Continuous integration
+      - name: Build ARM JSON
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az bicep build --file bicep/main.bicep --outfile ./main.json
+
+      - name: Upload a Build Artifact
+        uses: actions/upload-artifact@v2.2.4
+        with:
+          name: main.json
+          path: ./main.json
+
+      - name: What if deployment
+        uses: azure/CLI@v1
+        with:
+          inlineScript: |
+            az deployment sub what-if \
+            --location ${{env.DEPLOYMENT_LOCATION}} \
+            --template-file bicep/main.bicep \
+            --parameters \
+            environmentType=${{steps.branch-dependent-variables.outputs.DEPLOYMENT_ENVIRONMENT}} \
+            location=${{env.DEPLOYMENT_LOCATION}} \
+            prefix=${{env.RESOURCE_PREFIX}}
